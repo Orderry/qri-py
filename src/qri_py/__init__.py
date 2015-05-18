@@ -25,8 +25,3 @@ class QriPython:
 
     def close(self):
         self.sock.close()
-
-qri = QriPython(host="127.0.0.1", port=5679)
-qri.send(peer="123", message=b"101Hello Qri")
-qri.close()
-
