@@ -1,5 +1,4 @@
 import socket
-import binascii
 
 import msgpack
 
@@ -14,8 +13,7 @@ class QriPython:
         except socket.error, msg:
             print "Server {0}:{1} unreachable: {2}".format(host, port, msg)
 
-    def send(self, peer="123", message="ololo"):
-        checksum = binascii.crc32(peer)
+    def send(self, peer=None, checksum=None, message=None):
         packed_data = msgpack.packb([peer, checksum, message])
 
         try:
