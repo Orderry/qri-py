@@ -1,4 +1,5 @@
 import socket
+import logging
 
 import msgpack
 
@@ -11,7 +12,7 @@ class QriPython:
         try:
             self.sock.connect((host, port))
         except socket.error, msg:
-            print "Server {0}:{1} unreachable: {2}".format(host, port, msg)
+            logging.error("[QRI-PY] Server {0}:{1} unreachable: {2}".format(host, port, msg))
 
     def send(self, peer=None, checksum=None, message=None):
         packed_data = msgpack.packb([peer, checksum, message])
@@ -19,7 +20,7 @@ class QriPython:
         try:
             self.sock.send(packed_data)
         except socket.error, msg:
-            print "Error occurred during sending: {0}".format(msg)
+            logging.error("[QRI-PY] Error occurred during sending: {0}".format(msg))
 
     def close(self):
         self.sock.close()
