@@ -13,6 +13,7 @@ class QriPython(threading.Thread):
         self.port = port
         self.queue = Queue.Queue()
         self.alive = threading.Event()
+        self.alive.set()
         self.daemon = True
         self.sock = None
 
@@ -24,7 +25,6 @@ class QriPython(threading.Thread):
 
         try:
             self.sock.connect((self.host, self.port))
-            self.alive.set()
             return self.sock
 
         except socket.error, msg:
