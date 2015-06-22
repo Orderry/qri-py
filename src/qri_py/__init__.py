@@ -1,23 +1,30 @@
 import socket
 import logging
-
+import threading
 import msgpack
+import Queue
 
 
-class QriPython:
+class QriPython(threading.Thread):
 
     def __init__(self, host=None, port=None):
+        super(QriPython, self).__init__()
         self.host = host
         self.port = port
+        self.queue = Queue.Queue()
+        self.alive = threading.Event()
+        self.daemon = True
         self.sock = None
 
         self.connect()
+        self.start()
 
     def connect(self):
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
         try:
             self.sock.connect((self.host, self.port))
+            self.alive.set()
             return self.sock
 
         except socket.error, msg:
@@ -26,6 +33,18 @@ class QriPython:
             ))
             return None
 
+    def run(self):
+        while self.alive.isSet():
+            try:
+                packed_data = self.queue.get()
+                self._send(packed_data)
+            except Queue.Empty as e:
+                continue
+
+    def join(self, timeout=None):
+        self.alive.clear()
+        threading.Thread.join(self, timeout)
+
     def close(self):
         return self.sock.close()
 
@@ -33,9 +52,7 @@ class QriPython:
         self.close()
         return self.connect()
 
-    def send(self, peer=None, checksum=None, message=None):
-        packed_data = msgpack.packb([peer, checksum, message])
-
+    def _send(self, packed_data):
         try:
             return self.sock.send(packed_data)
         except socket.error:
@@ -48,3 +65,7 @@ class QriPython:
             except socket.error, msg:
                 logging.error("[QRI-PY] Error occurred during sending: {0}".format(msg))
                 return None
+
+    def send(self, peer=None, checksum=None, message=None):
+        packed_data = msgpack.packb([peer, checksum, message])
+        return self.queue.put(packed_data)

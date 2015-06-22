@@ -5,7 +5,7 @@ from distutils.core import setup
 
 setup(
     name='qri-py',
-    version='1.0.1',
+    version='1.0.2',
     description='Qri Python interface',
     author='va-dev',
     author_email='vadimanikin1@gmail.com',
