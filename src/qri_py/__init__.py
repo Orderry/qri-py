@@ -1,8 +1,11 @@
 import socket
 import logging
 import threading
-import msgpack
 import Queue
+
+from pyasn1.codec.ber import encoder
+
+from ber import Message
 
 
 class QriPython(threading.Thread):
@@ -16,6 +19,7 @@ class QriPython(threading.Thread):
         self.alive.set()
         self.daemon = True
         self.sock = None
+        self.msg = Message()
 
         self.connect()
         self.start()
@@ -67,5 +71,7 @@ class QriPython(threading.Thread):
                 return None
 
     def send(self, peer=None, checksum=None, message=None):
-        packed_data = msgpack.packb([peer, checksum, message])
-        return self.queue.put(packed_data)
+        self.msg.setComponentByName('peer', peer)
+        self.msg.setComponentByName('checksum', checksum)
+        self.msg.setComponentByName('message', message)
+        return self.queue.put(encoder.encode(self.msg))
