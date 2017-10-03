@@ -1,77 +1,103 @@
-import socket
+# ~*~ coding: utf-8 ~*~
+
 import logging
-import threading
+import multiprocessing
 import Queue
+import socket
+import time
 
-from pyasn1.codec.ber import encoder
+import pyasn1.codec.ber.encoder as ber_encoder
 
-from ber import Message
+from . import ber as qrischema
+
+log = logging.getLogger('qri')
 
 
-class QriPython(threading.Thread):
+class MessageSender(multiprocessing.Process):
 
-    def __init__(self, host=None, port=None):
-        super(QriPython, self).__init__()
+    def __init__(self, host, port, message_queue):
+        super(MessageSender, self).__init__()
+        # self.daemon = True
         self.host = host
         self.port = port
-        self.queue = Queue.Queue()
-        self.alive = threading.Event()
-        self.alive.set()
-        self.daemon = True
-        self.sock = None
-        self.msg = Message()
-
-        self.connect()
-        self.start()
-
-    def connect(self):
-        self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-
-        try:
-            self.sock.connect((self.host, self.port))
-            return self.sock
-
-        except socket.error, msg:
-            logging.error("[QRI-PY] Server {0}:{1} unreachable: {2}".format(
-                self.host, self.port, msg
-            ))
-            return None
-
-    def run(self):
-        while self.alive.isSet():
-            try:
-                packed_data = self.queue.get()
-                self._send(packed_data)
-            except Queue.Empty as e:
-                continue
+        self.message_queue = message_queue
+        self.running_flag = multiprocessing.Event()
+        self.running_flag.set()
 
     def join(self, timeout=None):
-        self.alive.clear()
-        threading.Thread.join(self, timeout)
+        self.running_flag.clear()
+        super(MessageSender, self).join(timeout)
 
-    def close(self):
-        return self.sock.close()
-
-    def reconnect(self):
-        self.close()
-        return self.connect()
-
-    def _send(self, packed_data):
+    def run(self):
+        log.info('Message sender: starting with %s:%s ...', self.host, self.port)
         try:
-            return self.sock.send(packed_data)
-        except socket.error:
-            sock = self.reconnect()
-            if not sock:
-                return None
+            self.send_messages()
+        except KeyboardInterrupt:
+            pass
+        log.info('Message sender: finished')
 
-            try:
-                return sock.send(packed_data)
-            except socket.error, msg:
-                logging.error("[QRI-PY] Error occurred during sending: {0}".format(msg))
-                return None
+    def send_messages(self):
+
+        SOCKET_TIMEOUT = 3  # seconds
+        CONNECT_RETRY_DELAY = 2  # seconds
+        MESSAGE_QUEUE_TIMEOUT = 1  # seconds
+
+        connected = False
+        sock = None
+        msg_to_send = None
+
+        while self.running_flag.is_set():
+
+            if not connected:
+                if sock is not None:
+                    sock.close()
+                log.info('Connecting to %s:%s ...', self.host, self.port)
+                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                sock.settimeout(SOCKET_TIMEOUT)
+                try:
+                    sock.connect((self.host, self.port))
+                except socket.error as e:
+                    log.error('Failed to connect to %s:%s with error: %s', self.host, self.port, e)
+                    log.info('Will retry to connect in %s second(s) ...', CONNECT_RETRY_DELAY)
+                    time.sleep(CONNECT_RETRY_DELAY)
+                else:
+                    log.info('Connected to %s:%s', self.host, self.port)
+                    connected = True
+
+            if connected:
+                if msg_to_send is None:
+                    try:
+                        msg_to_send = self.message_queue.get(True, MESSAGE_QUEUE_TIMEOUT)
+                    except Queue.Empty:
+                        continue
+                log.debug('Sending message of length %d ...', len(msg_to_send))
+                try:
+                    bytes_sent = sock.send(msg_to_send)
+                except socket.error as e:
+                    log.error('Failed to send: %s', e)
+                    log.info('Reconnecting ...')
+                    connected = False
+                else:
+                    if bytes_sent != len(msg_to_send):
+                        log.error('Failed to send: bytes sent does not match message length')
+                        log.info('Reconnecting ...')
+                        connected = False
+                    else:
+                        msg_to_send = None
+
+
+class Qri(object):
+
+    def __init__(self, host=None, port=None):
+        log.info('Setup: %s:%s', host, port)
+        self.queue = multiprocessing.Queue()
+        self.worker = MessageSender(host, port, self.queue)
+        self.worker.start()
 
     def send(self, peer=None, checksum=None, message=None):
-        self.msg.setComponentByName('peer', peer)
-        self.msg.setComponentByName('checksum', checksum)
-        self.msg.setComponentByName('message', message)
-        return self.queue.put(encoder.encode(self.msg))
+        msg = qrischema.Message()
+        msg['peer'] = peer
+        msg['checksum'] = checksum
+        msg['message'] = message
+        msgbytes = ber_encoder.encode(msg)
+        self.queue.put(msgbytes)
