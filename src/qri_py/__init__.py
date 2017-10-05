@@ -75,15 +75,15 @@ class MessageSender(multiprocessing.Process):
                         continue
                 log.debug('Sending message # %d of length %d ...', msg_seq_no, len(msg_to_send))
                 try:
-                    bytes_sent = sock.send(msg_to_send)
+                    bytes_consumed = sock.send(msg_to_send)
                 except socket.error as e:
                     log.error('Failed to send: %s', e)
                     log.info('Reconnecting ...')
                     connected = False
                     time.sleep(SEND_RETRY_DELAY)
                 else:
-                    if bytes_sent != len(msg_to_send):
-                        log.error('Failed to send: bytes sent does not match message length')
+                    if bytes_consumed != len(msg_to_send):
+                        log.error('Failed to send: bytes accepted for sending does not match message length')
                         log.info('Reconnecting ...')
                         connected = False
                         time.sleep(SEND_RETRY_DELAY)
