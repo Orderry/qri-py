@@ -17,7 +17,7 @@ class MessageSender(multiprocessing.Process):
 
     def __init__(self, host, port, message_queue):
         super(MessageSender, self).__init__()
-        # self.daemon = True
+        self.daemon = True
         self.host = host
         self.port = port
         self.message_queue = message_queue
