@@ -5,7 +5,7 @@ from setuptools import setup
 
 setup(
     name='qri-py',
-    version='2.0.0',
+    version='2.0.1',
     description='Qri Python interface',
     author='va-dev',
     author_email='vadimanikin1@gmail.com',

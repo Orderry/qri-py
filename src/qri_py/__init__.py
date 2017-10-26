@@ -29,12 +29,12 @@ class MessageSender(multiprocessing.Process):
         super(MessageSender, self).join(timeout)
 
     def run(self):
-        log.info('Message sender: starting with %s:%s ...', self.host, self.port)
+        log.info('Starting with %s:%s ...', self.host, self.port)
         try:
             self.send_messages()
         except KeyboardInterrupt:
             pass
-        log.info('Message sender: finished')
+        log.info('Finished')
 
     def send_messages(self):
 
@@ -49,6 +49,13 @@ class MessageSender(multiprocessing.Process):
         msg_seq_no = 0
 
         while self.running_flag.is_set():
+
+            if msg_to_send is None:
+                try:
+                    msg_to_send = self.message_queue.get(True, MESSAGE_QUEUE_TIMEOUT)
+                    msg_seq_no += 1
+                except Queue.Empty:
+                    continue
 
             if not connected:
                 if sock is not None:
@@ -67,12 +74,6 @@ class MessageSender(multiprocessing.Process):
                     connected = True
 
             if connected:
-                if msg_to_send is None:
-                    try:
-                        msg_to_send = self.message_queue.get(True, MESSAGE_QUEUE_TIMEOUT)
-                        msg_seq_no += 1
-                    except Queue.Empty:
-                        continue
                 log.debug('Sending message # %d of length %d ...', msg_seq_no, len(msg_to_send))
                 try:
                     bytes_consumed = sock.send(msg_to_send)
