@@ -2,7 +2,7 @@
 
 import logging
 import multiprocessing
-import Queue
+import queue
 import socket
 import time
 
@@ -54,7 +54,7 @@ class MessageSender(multiprocessing.Process):
                 try:
                     msg_to_send = self.message_queue.get(True, MESSAGE_QUEUE_TIMEOUT)
                     msg_seq_no += 1
-                except Queue.Empty:
+                except queue.Empty:
                     continue
 
             if not connected:
